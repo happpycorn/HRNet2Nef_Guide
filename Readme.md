@@ -1,37 +1,50 @@
-用了點 AI 和 docker 的小魔法，總之它可以自動跑了
+# HRNet to Kneron (KL730) 模型轉換
 
-## 檔案結構介紹
+本專案提供了一套流程，將 HRNet 姿態估計模型 從 PyTorch 權重 (.pth) 轉換為 Kneron 730 專用的硬體模型 (.nef)。用了點 AI 和 docker 的小魔法，簡化了過程中容易出錯的環境和檔案設定。
+
+## 專案結構
+
+轉換前請確保目錄結構如下，這是 Docker 掛載路徑的基礎：
+
+```Plaintext
+.
+├── 0_Input                 # 存放所有輸入資源
+│   ├── calib_images/       # [必備] 存放約 20-50 張量化用的校準照片
+│   ├── *.pth               # [必備] HRNet 原始權重檔
+│   └── test.jpg            # [建議] 測試用照片，確認 ONNX 邏輯正確
+├── 0_Output                # 存放產出的 .onnx 與 .nef 檔案
+├── 1_Hrnet2Onnx            # HRNet 轉換與修復腳本
+├── 2_Onnx2Nef              # Kneron 轉換工具與 Dockerfile
+├── .gitignore
+├── docker-compose.yml
+└── README.md
+```
 
 ## 準備步驟
 
-在 input 放上 pth 檔案，連結：https://huggingface.co/Prophetetc/cocopose/blob/main/pose_hrnet_w32_256x192.pth?utm_source=chatgpt.com
+1. 下載模型權重： 將 [pose_hrnet_w32_256x192.pth](https://huggingface.co/Prophetetc/cocopose/blob/main/pose_hrnet_w32_256x192.pth?utm_source=chatgpt.com) 放入 `0_Input`。
 
-在底下建立一個資料夾叫做 calib_images，把量化用的資料集（照片）放進去（建議可以在放進去之前用 onnx 測試一下效果對不對，不然很容易挑到錯的資料），可以不用管名字
+1. 準備校準資料集： 在 `0_Input/calib_images` 放進 20~50 張與任務相關的照片。
 
-然後在 input 放入測試用的照片，可以直接從量化的資料集抓一張就好了，用來測試 onnx 到底對不對的，把它命名為 test.jpg
+    **Note: 這些照片將決定模型量化後的精度，建議使用與實際應用場景相似的照片。**
 
-確認你現在的 input 長這樣
+1. 從資料集挑選任一一張照片作為測試照片放在 `0_Input`，並命名為 `test.jpg`
 
-```
-folder
-    0_Input
-        calib_images
-            many images
-        ......pth
-        test.jpg
-```
+## 執行流程
 
-## 安裝方法
+### Step 1: 構建環境
 
-確認你有裝 docker 而且你的 docker 有開之後，首先你要 compile
-
-```bash
+```Bash
 docker compose build
 ```
 
-接著直接運行
+需要等待一段時間，請耐心等候
 
-```bash
+### Step 2: 匯出 ONNX
+
+將 PyTorch 權重轉換為標準 ONNX 格式：
+
+```Bash
 docker compose run --rm hrnet python export_hrnet_onnx.py \
     --weights /input/pose_hrnet_w32_256x192.pth \
     --cfg experiments/coco/hrnet/w32_256x192_adam_lr1e-3.yaml \
@@ -39,73 +52,72 @@ docker compose run --rm hrnet python export_hrnet_onnx.py \
     --output /output/pose_hrnet_w32_256x192.onnx
 ```
 
-極有可能會噴出一堆警告（例如說你和我一樣用 mac 跑），但總之看到類似
+可能會有一些錯誤，但如果你看到 *`[ok] ONNX simplified.`* 等內容，代表模型已經成功匯出且模型結構已初步優化。你將會在 `0_Output` 看到名為 `pose_hrnet_w32_256x192.onnx` 的檔案。
 
-> 
-> [ok] ONNX simplified.
-> Done. You can now run your ONNX → NEF conversion tool.
->
+### Step 3: 修復與驗證 ONNX (關鍵步驟)
 
-的東西就是可以了，你可以在 0_Output 中找到 .onnx 結尾的檔案，之後再看有沒有人可以修吧
+由於 Kneron 工具鏈對特定算子有相容性要求，需執行修復並測試結果：
 
-然後因為出現了奇怪的 bug，所以要執行 fix_onnx，啊很怪，但能跑，也是看之後有沒有辦法修好。
-
-```bash
+```Bash
+# 1. 執行修復 (Fix Onnx Nodes)
 docker compose run --rm hrnet python fix_onnx.py
-```
 
-跑好了之後在量化之前先測試一下 onnx 是否正常
-
-```bash
+# 2. 測試 ONNX 輸出數值
 docker compose run --rm hrnet python test_onnx.py
-```
 
-會輸出一個 npy 檔案在 0_Output，接下來運行
-
-```bash
+# 3. 視覺化驗證：畫出骨架圖確認模型沒壞掉
 docker compose run --rm hrnet python draw_result.py
 ```
 
-理論上就會有照片在 0_Output 出來了，恭喜恭喜。
+請檢查 `0_Output` 是否產出了正確的骨架圖片，確保模型轉換過程沒有遺失關鍵資訊。
 
-接下來要做的事情是把剛剛的 onnx 轉換為 nef，
+\*註：理論上是不需要執行修復的，應該是一個 Bug，有待日後處理。
 
-```bash
-docker compose run --rm kneron python onnx2nef730.py \                                                    HEAD
+### Step 4: 編譯為 Kneron NEF 檔案
+
+使用 Kneron Toolchain 進行量化與硬體編譯：
+
+```Bash
+docker compose run --rm kneron python onnx2nef730.py \
     --onnx /output/pose_hrnet_fix.onnx \
     --chip 730 \
     --images /input/calib_images \
     --out_dir /output
 ```
 
-注意到運行的環境有變更，從 hrnet 變成 kneron。出現 ✅ Done. 就是成功了
+看到 ✅ Done. 出現後，0_Output/models_730.nef 即可用於硬體部署。
 
+## 技術細節與常見坑洞
 
+1. Kneron Toolchain 的目錄覆蓋問題
 
-## 補充
+    kneron/toolchain 映像檔預設的工作目錄在 /workspace。若將本地資料夾直接掛載至此，會覆蓋掉容器內建的 miniconda 與工具鏈。
 
-下面這段相當於在 hrnet 的環境下運行後面的指令，所以當然可以運行 ls 等指令幫助你 debug，希望可以幫到你
+    - 解法：本專案將程式掛載於 /workspace/docker_mount，確保工具箱完整無損。
 
-```bash
-docker compose run --rm [cmd_name] [指令]
-```
+1. Python 指令找不到的 Bug
 
-或是你也可以直接這樣進入他的終端機
+    容器內建的 ktc 工具在執行子程序時會固定尋找 python 指令，而非 python3。
 
-```bash
-docker compose run --rm [cmd_name] bash
-```
+    解法：我們在 Dockerfile 中加入了「強制開機」魔法：
 
-然後 kneron/toolchain 把他的工作列放在 workspace，覆蓋掉的話會全部炸掉，要注意一下。我在程式中是將程式放在 workspace 底下的 docker_mount 下。
+    ```Bash
+    # 建立軟連結確保指令相容
+    RUN ln -sf /workspace/miniconda/envs/onnx1.13/bin/python /usr/bin/python
+    # 強制將正確的環境加入系統路徑
+    ENV PATH="/workspace/miniconda/envs/onnx1.13/bin:$PATH"
+    ```
 
-然後 kneron/toolchain 有很奇怪的 bug，他找進去之後不知道為什麼會找不到 python，所以我在 dockerfile 加上這兩行讓他的 python 強制開機
+1. Apple Silicon (M1/M2/M3) 警告
 
-```bash
-# 1. 修正 Python 軟連結，讓 ktc 內部子程序找得到指令
-RUN ln -sf /workspace/miniconda/envs/onnx1.13/bin/python /usr/bin/python
+    若你在 Mac 上執行，Docker 會提醒平台不匹配（AMD64 vs ARM64）。
 
-# 2. 強迫環境變數生效，讓 python 指向正確的房間
-ENV PATH="/workspace/miniconda/envs/onnx1.13/bin:$PATH"
-```
+    說明：這是正常的，我們透過 platform: linux/amd64 強制執行，雖然速度稍慢但能保證編譯結果正確。
 
-理論上是不需要的，但他就是炸了，所以我也不知道到底是怎樣，之後有機會再修。
+## 實用指令總結
+
+|指令目的|指令範例|
+|-|-|
+|進入互動式終端機|`docker compose run --rm [服務名] bash`|
+|快速 Debug|`docker compose run --rm [服務名] ls -R /workspace`|
+|清理容器殘留|`docker compose down`|
