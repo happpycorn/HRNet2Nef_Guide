@@ -1,0 +1,8 @@
+opencv-python
+PyYAML
+scipy
+tqdm
+onnx
+onnxruntime
+yacs
+onnx-simplifier

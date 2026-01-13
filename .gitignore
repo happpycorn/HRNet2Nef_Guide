@@ -1,0 +1,9 @@
+.DS_Store
+
+# Libary
+1_Hrnet2Onnx/experiments/*
+1_Hrnet2Onnx/lib/*
+
+# Input & Output
+0_Input/*
+0_Output/*

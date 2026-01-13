@@ -1,0 +1,9 @@
+FROM kneron/toolchain:latest
+
+# 1. 修正 Python 軟連結，讓 ktc 內部子程序找得到指令
+RUN ln -sf /workspace/miniconda/envs/onnx1.13/bin/python /usr/bin/python
+
+# 2. 強迫環境變數生效，讓 python 指向正確的房間
+ENV PATH="/workspace/miniconda/envs/onnx1.13/bin:$PATH"
+
+WORKDIR /workspace/docker_mount

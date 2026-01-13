@@ -1,0 +1,22 @@
+services:
+  # HRNet 環境：負責匯出模型與修復版本  [cite: 85-89, 258]
+  hrnet:
+    build:
+      context: ./1_Hrnet2Onnx
+    volumes:
+      - ./1_Hrnet2Onnx:/workspace
+      - ./0_Input:/input
+      - ./0_Output:/output
+    working_dir: /workspace
+    tty: true
+
+    # Kneron 工具鏈：現在指向 2_Onnx2Nef
+  kneron:
+    build: 
+      context: ./2_Onnx2Nef      # 修改這裡
+    volumes:
+      - ./2_Onnx2Nef:/workspace/docker_mount  # 程式碼掛載到 workspace
+      - ./0_Input:/input         # 需要讀取校準照片 [cite: 93]
+      - ./0_Output:/output       # 讀取 ONNX 並產出 NEF 
+    working_dir: /workspace/docker_mount
+    tty: true

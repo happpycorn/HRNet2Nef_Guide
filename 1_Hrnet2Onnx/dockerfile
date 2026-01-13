@@ -1,0 +1,22 @@
+FROM pytorch/pytorch:1.10.0-cuda11.3-cudnn8-devel
+
+# 1. 解決 NVIDIA GPG 金鑰過期的問題
+# 先移除舊的 GPG key 並下載官方最新的金鑰
+RUN rm -f /etc/apt/sources.list.d/cuda.list && \
+    rm -f /etc/apt/sources.list.d/nvidia-ml.list && \
+    apt-key del 7fa2af80 && \
+    apt-get update && apt-get install -y wget && \
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-keyring_1.0-1_all.deb && \
+    dpkg -i cuda-keyring_1.0-1_all.deb
+
+# 2. 現在可以正常執行更新並安裝系統套件了 [cite: 22-23]
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 && \
+    rm -rf /var/lib/apt/lists/*
+
+# 3. 處理 Python 套件清單 [cite: 39]
+COPY requirements.txt /workspace/requirements.txt
+RUN pip install --no-cache-dir -r /workspace/requirements.txt
+
+WORKDIR /workspace
