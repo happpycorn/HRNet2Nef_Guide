@@ -85,21 +85,21 @@ docker compose run --rm kneron python onnx2nef730.py \
     --out_dir /output
 ```
 
-看到 ✅ Done. 出現後，0_Output/models_730.nef 即可用於硬體部署。
+看到 `✅ Done.` 出現後，`0_Output/models_730.nef` 即可用於硬體部署。
 
 ## 技術細節與常見坑洞
 
 1. Kneron Toolchain 的目錄覆蓋問題
 
-    kneron/toolchain 映像檔預設的工作目錄在 /workspace。若將本地資料夾直接掛載至此，會覆蓋掉容器內建的 miniconda 與工具鏈。
+    `kneron/toolchain` 映像檔預設的工作目錄在 `/workspace`。若將本地資料夾直接掛載至此，會覆蓋掉容器內建的 `miniconda` 與工具鏈。
 
-    - 解法：本專案將程式掛載於 /workspace/docker_mount，確保工具箱完整無損。
+    - 解法：本專案將程式掛載於 `/workspace/docker_mount`，確保工具箱完整無損。
 
 1. Python 指令找不到的 Bug
 
-    容器內建的 ktc 工具在執行子程序時會固定尋找 python 指令，而非 python3。
+    容器內建的 `ktc` 工具在執行子程序時會固定尋找 `python` 指令，而非 `python3`。
 
-    解法：我們在 Dockerfile 中加入了「強制開機」魔法：
+    解法：我們在 `Dockerfile` 中加入了「強制開機」魔法：
 
     ```Bash
     # 建立軟連結確保指令相容
@@ -108,11 +108,13 @@ docker compose run --rm kneron python onnx2nef730.py \
     ENV PATH="/workspace/miniconda/envs/onnx1.13/bin:$PATH"
     ```
 
+    \*註：理論上也是不該這樣做的，應該也是一個 Bug，有待日後處理。
+
 1. Apple Silicon (M1/M2/M3) 警告
 
     若你在 Mac 上執行，Docker 會提醒平台不匹配（AMD64 vs ARM64）。
 
-    說明：這是正常的，我們透過 platform: linux/amd64 強制執行，雖然速度稍慢但能保證編譯結果正確。
+    說明：這是正常的，我們透過 `platform: linux/amd64` 強制執行，雖然速度稍慢但能保證編譯結果正確。
 
 ## 實用指令總結
 
