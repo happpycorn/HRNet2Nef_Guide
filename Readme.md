@@ -2,29 +2,73 @@
 
 本專案提供了一套流程，將 HRNet 姿態估計模型 從 PyTorch 權重 (.pth) 轉換為 Kneron 730 專用的硬體模型 (.nef)。用了點 AI 和 docker 的小魔法，簡化了過程中容易出錯的環境和檔案設定。
 
+步驟概覽
+
+
 ```mermaid
-graph LR
-    %% 定義輸入
-    Start([.pth 權重檔]) --> Step2
+flowchart LR
+    %% 全域樣式設定
+    %% {init: {'theme': 'dark', 'themeVariables': { 'lineColor': '#FFFFFF' }}} %%
 
-    subgraph Container_HRNet [Container: hrnet]
-        Step2[Step 2: 匯出 ONNX] --> Step3[Step 3: 修復與驗證 ONNX]
-        Step3 --> Output_ONNX[pose_hrnet_fix.onnx]
+    %% 資料輸入 (側邊補給)
+    subgraph Inputs [ 📁 0_Input ]
+        direction TB
+        Calib[[calib_images]]
+        PTH([.pth file])
+        TestImg([test.jpg])
     end
 
-    Output_ONNX --> Step4
-
-    subgraph Container_Kneron [Container: kneron]
-        Step4[Step 4: 編譯與量化] --> Step5[Step 5: Nef 測試]
+    %% 主流程：HRNet 環境
+    subgraph HRNet_Env [ 🐳 Container: HRNet ]
+        direction LR
+        S2[Step 2: 匯出 ONNX] --> S3[Step 3: 修復與驗證]
     end
 
-    Step5 --> End([.nef 硬體模型])
+    %% 中間產物
+    ONNX[[pose_hrnet_fix.onnx]]
 
-    %% 樣式設定
-    style Container_HRNet fill:#f9f,stroke:#333,stroke-width:2px
-    style Container_Kneron fill:#bbf,stroke:#333,stroke-width:2px
-    style Start fill:#dfd
-    style End fill:#dfd
+    %% 主流程：Kneron 環境
+    subgraph Kneron_Env [ 🐳 Container: Kneron ]
+        direction LR
+        S4[Step 4: 編譯與量化] --> S5[Step 5: NEF 測試]
+    end
+
+    %% 最終輸出
+    subgraph Outputs [ 📁 0_Output ]
+        direction TB
+        NEF[[models_730.nef]]
+        IMG([final_pose_result.jpg])
+    end
+
+    %% 關鍵連線：建立順序感
+    PTH -.-> S2
+    S2 --> S3
+    TestImg -.-> S3
+    
+    S3 ==> ONNX
+    
+    ONNX ==> S4
+    Calib -.-> S4
+    S4 --> S5
+    TestImg -.-> S5
+    
+    S5 ==> NEF
+    S3 -.-> IMG
+    S5 -.-> IMG
+
+    %% 樣式美化
+    classDef mainProcess fill:#3d3d3d,stroke:#fff,stroke-width:2px;
+    classDef container fill:transparent,stroke-dasharray: 5 5,stroke-width:2px;
+    classDef artifact fill:#44475a,stroke:#bd93f9,stroke-width:2px,color:#bd93f9;
+    classDef inputNode fill:#282a36,stroke:#6272a4,color:#8be9fd;
+
+    class S2,S3,S4,S5 mainProcess;
+    class HRNet_Env,Kneron_Env container;
+    class ONNX,NEF,IMG artifact;
+    class PTH,Calib,TestImg inputNode;
+    
+    %% 強調主線連線
+    linkStyle 4,5,10 stroke:#bd93f9,stroke-width:4px;
 ```
 
 ## 專案結構
