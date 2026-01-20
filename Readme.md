@@ -87,6 +87,15 @@ docker compose run --rm kneron python onnx2nef730.py \
 
 看到 `✅ Done.` 出現後，`0_Output/models_730.nef` 即可用於硬體部署。
 
+### （可選）Nef 測試
+
+運行以下兩行可以測試輸出的 Nef 是否正確，結果會變成圖片輸出在 `0_Output`。
+
+```Bash
+docker compose run --rm kneron python test_nef730.py
+docker compose run --rm kneron python draw_result.py
+```
+
 ## 技術細節與常見坑洞
 
 1. Kneron Toolchain 的目錄覆蓋問題
