@@ -90,6 +90,8 @@ flowchart LR
 
 ## 準備步驟
 
+1. 進行 clone 之後，在專案資料夾中建立 `0_Input` 資料夾。
+
 1. 下載模型權重： 將 [pose_hrnet_w32_256x192.pth](https://huggingface.co/Prophetetc/cocopose/blob/main/pose_hrnet_w32_256x192.pth?utm_source=chatgpt.com) 放入 `0_Input`。
 
 1. 準備校準資料集： 在 `0_Input/calib_images` 放進 20~50 張與任務相關的照片。
@@ -200,3 +202,13 @@ docker compose run --rm kneron python draw_result.py
 |進入互動式終端機|`docker compose run --rm [服務名] bash`|
 |快速 Debug|`docker compose run --rm [服務名] ls -R /workspace`|
 |清理容器殘留|`docker compose down`|
+
+## 參考來源
+
+官方網站：[Kneron](https://kneron.github.io/kneopi-documentation/examples/tc/yolov7.html)
+
+硬體工具：[Kneron Toolchain Docker](https://doc.kneron.com/docs/)
+
+模型結構：[HRNet (High-Resolution Network)](https://github.com/HRNet/HRNet-Human-Pose-Estimation)
+
+*註：`1_Hrnet2Onnx` 中的 `lib` 和 `experiments` 來自 [https://github.com/HRNet/HRNet-Human-Pose-Estimation](https://github.com/HRNet/HRNet-Human-Pose-Estimation)
