@@ -2,6 +2,31 @@
 
 本專案提供了一套流程，將 HRNet 姿態估計模型 從 PyTorch 權重 (.pth) 轉換為 Kneron 730 專用的硬體模型 (.nef)。用了點 AI 和 docker 的小魔法，簡化了過程中容易出錯的環境和檔案設定。
 
+```mermaid
+graph LR
+    %% 定義輸入
+    Start([.pth 權重檔]) --> Step2
+
+    subgraph Container_HRNet [Container: hrnet]
+        Step2[Step 2: 匯出 ONNX] --> Step3[Step 3: 修復與驗證 ONNX]
+        Step3 --> Output_ONNX[pose_hrnet_fix.onnx]
+    end
+
+    Output_ONNX --> Step4
+
+    subgraph Container_Kneron [Container: kneron]
+        Step4[Step 4: 編譯與量化] --> Step5[Step 5: Nef 測試]
+    end
+
+    Step5 --> End([.nef 硬體模型])
+
+    %% 樣式設定
+    style Container_HRNet fill:#f9f,stroke:#333,stroke-width:2px
+    style Container_Kneron fill:#bbf,stroke:#333,stroke-width:2px
+    style Start fill:#dfd
+    style End fill:#dfd
+```
+
 ## 專案結構
 
 轉換前請確保目錄結構如下，這是 Docker 掛載路徑的基礎：
@@ -96,13 +121,13 @@ docker compose run --rm kneron python test_nef730.py
 docker compose run --rm kneron python draw_result.py
 ```
 
-## 技術細節與常見坑洞
+## 技術細節與常見問題
 
 1. Kneron Toolchain 的目錄覆蓋問題
 
-    `kneron/toolchain` 映像檔預設的工作目錄在 `/workspace`。若將本地資料夾直接掛載至此，會覆蓋掉容器內建的 `miniconda` 與工具鏈。
+    `kneron/toolchain` 映像檔預設的工作目錄在 `/workspace`。若將本地資料夾直接掛載至此，會覆蓋掉容器內建的 `miniconda` 與工具鏈，常見影響是找不到 ktc 工具箱等類似錯誤。
 
-    - 解法：本專案將程式掛載於 `/workspace/docker_mount`，確保工具箱完整無損。
+    - 解法：將程式掛載於 `/workspace/docker_mount` 或其他地址即可確保工具箱完整無損。
 
 1. Python 指令找不到的 Bug
 
@@ -117,15 +142,15 @@ docker compose run --rm kneron python draw_result.py
     ENV PATH="/workspace/miniconda/envs/onnx1.13/bin:$PATH"
     ```
 
-    \*註：理論上也是不該這樣做的，應該也是一個 Bug，有待日後處理。
+    \*註：理論上是不該這樣做的，應該也是一個 Bug，有待日後處理。
 
 1. Apple Silicon (M1/M2/M3) 警告
 
     若你在 Mac 上執行，Docker 會提醒平台不匹配（AMD64 vs ARM64）。
 
-    說明：這是正常的，我們透過 `platform: linux/amd64` 強制執行，雖然速度稍慢但能保證編譯結果正確。
+    說明：這是正常的，我們透過 `platform: linux/amd64` 強制執行，雖然速度稍慢但不影響結果。
 
-## 實用指令總結
+## 常用指令
 
 |指令目的|指令範例|
 |-|-|
